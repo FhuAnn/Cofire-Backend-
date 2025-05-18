@@ -84,7 +84,7 @@ Only return a single line of code as the next suggestion.
     const response = await result.response;
     const code = response.text().trim();
 
-    res.json({ suggestion : code });
+    res.json({ suggestion: code });
   } catch (error) {
     console.error("Gemini API Error:", error.message);
     res.status(500).json({ error: "Gemini API failed" });
@@ -112,6 +112,109 @@ app.get("/status", async (req, res) => {
     res.status(500).json({ status: "error", message: err.message });
   }
 });
+
+app.post("/suggest-block", async (req, res) => {
+  const { language, context } = req.body;
+  if (!language || !context)
+    return res.status(400).json({ message: "Missing input" });
+
+  const prompt = `
+You are an expert coding assistant.
+Given the following programming language and a partial description or code block, generate a complete, syntactically correct, and logically meaningful code block (function, method, or class).
+
+Language: ${language}
+Input:
+${context}
+
+→ Completed Code Block:
+`.trim();
+
+  try {
+    const model = genAI.getGenerativeModel({ model: "gemini-2.0-pro" });
+    const result = await model.generateContent(prompt);
+    const text = await result.response.text();
+
+    res.json({ code: text.trim() });
+  } catch (error) {
+    console.error("Gemini error:", error.message);
+    res.status(500).json({ message: "Failed to get suggestion from Gemini" });
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`Mock AI server running at http://localhost:${PORT}`);
+});
+app.post("/explain-code", async (req, res) => {
+  const { code, language } = req.body;
+  if (!code || !language)
+    return res.status(400).json({ message: "Missing code or language" });
+
+  const fullPrompt = `
+Bạn là một lập trình viên AI thông minh.
+Hãy giải thích đoạn mã sau bằng ngôn ngữ tự nhiên, rõ ràng, chi tiết, và dễ hiểu cho người học.
+
+Ngôn ngữ: ${language}
+Đoạn mã:
+${code}
+
+Giải thích:
+`.trim();
+
+  try {
+    const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
+    const result = await model.generateContent(fullPrompt);
+    const response = await result.response;
+    const explanation = response.text().trim();
+    res.json({ data: explanation });
+  } catch (error) {
+    console.error("Gemini API Error:", error.message);
+    res.status(500).json({ error: "Gemini failed to explain code." });
+  }
+});
+app.post("/generate-file-from-prompt", async (req, res) => {
+  const { prompt, language } = req.body;
+
+  if (!prompt) return res.status(400).json({ message: "Missing prompt" });
+
+  const fullPrompt = `
+You are an expert software engineer AI assistant.
+Given the following prompt, generate a full working code block.
+Prompt: ${prompt}
+Language: ${language || "auto-detect"}
+
+Respond with code only, properly formatted.
+`.trim();
+
+  try {
+    const model = genAI.getGenerativeModel({ model: "gemini-2.0-pro" });
+    const result = await model.generateContent(fullPrompt);
+    const response = await result.response;
+    const code = response.text().trim();
+
+    res.json({ data: code });
+  } catch (error) {
+    console.error("AI Error:", error.message);
+    res.status(500).json({ message: "Failed to generate code" });
+  }
+});
+
+app.post("/api/chat", async (req, res) => {
+  const messages = req.body.messages;
+
+  if (!messages || !Array.isArray(messages)) {
+    return res.status(400).json({ message: "messages (array) is required" });
+  }
+
+  try {
+    const chat = model.startChat({ history: messages });
+    const result = await chat.sendMessage(
+      messages[messages.length - 1].content
+    );
+    const response = result.response.text();
+
+    res.json({ result: response });
+  } catch (error) {
+    console.error("❌ Lỗi gọi Gemini:", error);
+    res.status(500).json({ message: "Lỗi từ Gemini API: " + error.message });
+  }
 });
