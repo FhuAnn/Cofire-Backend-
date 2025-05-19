@@ -14,7 +14,7 @@ const GEMINI_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 app.post("/suggest", (req, res) => {
   const { language, context } = req.body;
-  console.log(`Language: ${language}, Context:\n${context}`);
+  //console.log(`Language: ${language}, Context:\n${context}`);
 
   // Trả về mock suggestion
   res.json({
@@ -31,7 +31,7 @@ app.post("/suggest", (req, res) => {
 
 app.post("/manual-prompt", async (req, res) => {
   const { prompt, language, context } = req.body;
-  console.log(prompt, language, context);
+  //console.log(prompt, language, context);
   const fullPrompt = `
 You're an AI code assistant.
 
@@ -51,7 +51,7 @@ ${prompt}
 
     const response = await result.response;
     const code = response.text().trim();
-    console.log("code", code);
+    //g("code", code);
 
     res.json({ data: code });
   } catch (error) {
@@ -102,7 +102,7 @@ app.get("/status", async (req, res) => {
     });
 
     const result = await geminiRes.json();
-    console.log(result);
+    //console.log(result);
     if (result.candidates?.length > 0) {
       res.json({ status: "ready" });
     } else {
@@ -173,7 +173,6 @@ Giải thích:
 });
 app.post("/generate-file-from-prompt", async (req, res) => {
   const { prompt, language } = req.body;
-
   if (!prompt) return res.status(400).json({ message: "Missing prompt" });
 
   const fullPrompt = `
@@ -199,22 +198,21 @@ Respond with code only, properly formatted.
 });
 
 app.post("/api/chat", async (req, res) => {
-  const messages = req.body.messages;
-
-  if (!messages || !Array.isArray(messages)) {
-    return res.status(400).json({ message: "messages (array) is required" });
+  const { fullPrompt } = req.body;
+  console.log("api/chat", fullPrompt);
+  if (!fullPrompt) {
+    return res.status(400).json({ message: " fullPrompt is required" });
   }
 
   try {
-    const chat = model.startChat({ history: messages });
-    const result = await chat.sendMessage(
-      messages[messages.length - 1].content
-    );
-    const response = result.response.text();
+    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+    const result = await model.generateContent(fullPrompt);
+    const response = await result.response;
+    const code = response.text().trim();
 
-    res.json({ result: response });
+    res.json({ data: code });
   } catch (error) {
-    console.error("❌ Lỗi gọi Gemini:", error);
-    res.status(500).json({ message: "Lỗi từ Gemini API: " + error.message });
+    console.error("AI Error:", error.message);
+    res.status(500).json({ message: "Failed to generate code" });
   }
 });
