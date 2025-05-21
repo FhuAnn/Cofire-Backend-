@@ -216,3 +216,47 @@ app.post("/api/chat", async (req, res) => {
     res.status(500).json({ message: "Failed to generate code" });
   }
 });
+
+app.post("/api/inline-completion", async (req, res) => {
+  const { full, language, codeUntilCursor } = req.body;
+  console.log("api/inline-completiont", full, codeUntilCursor, language);
+  if (!full || !codeUntilCursor || !language) {
+    return res
+      .status(400)
+      .json({ message: " full and codeUntilCursor and language is required" });
+  }
+  const fullPrompt = `
+You are a senior developer assistant.
+
+Continue writing the following code, without any explanation or extra text. Only return the code content that should come next, based on the context:
+\`\`\`
+Language:
+\`\`\`${language}
+
+\`\`\`
+Full file text:
+\`\`\`
+${full}
+\` Code until cursor:
+${codeUntilCursor}
+\`\`\`
+Just retun only code
+`;
+  try {
+    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+    const result = await model.generateContent({
+      contents: [{ role: "user", parts: [{ text: fullPrompt }] }],
+      generationConfig: {
+        temperature: 0.5,
+        maxOutputTokens: 100,
+      },
+    });
+    const response = await result.response;
+    const code = response.text().trim();
+
+    res.json({ data: code });
+  } catch (error) {
+    console.error("AI Error:", error.message);
+    res.status(500).json({ message: "Failed to generate code" });
+  }
+});
