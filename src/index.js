@@ -12,6 +12,8 @@ app.use(express.json());
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const GEMINI_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`;
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+
 app.post("/suggest", (req, res) => {
   const { language, context } = req.body;
   //console.log(`Language: ${language}, Context:\n${context}`);
@@ -45,8 +47,6 @@ ${prompt}
 → Respond with appropriate code only.
 `.trim();
   try {
-    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
-
     const result = await model.generateContent(fullPrompt);
 
     const response = await result.response;
@@ -130,7 +130,6 @@ ${context}
 `.trim();
 
   try {
-    const model = genAI.getGenerativeModel({ model: "gemini-2.0-pro" });
     const result = await model.generateContent(prompt);
     const text = await result.response.text();
 
@@ -141,9 +140,6 @@ ${context}
   }
 });
 
-app.listen(PORT, () => {
-  console.log(`Mock AI server running at http://localhost:${PORT}`);
-});
 app.post("/explain-code", async (req, res) => {
   const { code, language } = req.body;
   if (!code || !language)
@@ -161,7 +157,6 @@ Giải thích:
 `.trim();
 
   try {
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-pro" });
     const result = await model.generateContent(fullPrompt);
     const response = await result.response;
     const explanation = response.text().trim();
@@ -185,7 +180,6 @@ Respond with code only, properly formatted.
 `.trim();
 
   try {
-    const model = genAI.getGenerativeModel({ model: "gemini-2.0-pro" });
     const result = await model.generateContent(fullPrompt);
     const response = await result.response;
     const code = response.text().trim();
@@ -205,7 +199,6 @@ app.post("/api/chat", async (req, res) => {
   }
 
   try {
-    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
     const result = await model.generateContent(fullPrompt);
     const response = await result.response;
     const code = response.text().trim();
@@ -216,6 +209,7 @@ app.post("/api/chat", async (req, res) => {
     res.status(500).json({ message: "Failed to generate code" });
   }
 });
+let timeoutId = null;
 
 app.post("/api/inline-completion", async (req, res) => {
   const { full, language, codeUntilCursor } = req.body;
@@ -243,7 +237,6 @@ ${codeUntilCursor}
 Just retun only code
 `;
   try {
-    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
     const result = await model.generateContent({
       contents: [{ role: "user", parts: [{ text: fullPrompt }] }],
       generationConfig: {
@@ -253,10 +246,12 @@ Just retun only code
     });
     const response = await result.response;
     const code = response.text().trim();
-
     res.json({ data: code });
   } catch (error) {
     console.error("AI Error:", error.message);
     res.status(500).json({ message: "Failed to generate code" });
   }
+});
+app.listen(PORT, () => {
+  console.log(`Mock AI server running at http://localhost:${PORT}`);
 });
