@@ -220,21 +220,20 @@ app.post("/api/inline-completion", async (req, res) => {
       .json({ message: " full and codeUntilCursor and language is required" });
   }
   const fullPrompt = `
-You are a senior developer assistant.
+  You are an expert developer assistant.
 
-Continue writing the following code, without any explanation or extra text. Only return the code content that should come next, based on the context:
-\`\`\`
-Language:
-\`\`\`${language}
+Given the following context, continue writing the code at the cursor position.
+- Only return the next lines of code that should come after the cursor.
+- Do NOT include any explanations, comments, or markdown formatting (such as triple backticks or language tags).
+- Output ONLY valid code for the language: ${language}.
 
-\`\`\`
-Full file text:
-\`\`\`
+Full file content:
 ${full}
-\` Code until cursor:
+
+Code until cursor:
 ${codeUntilCursor}
-\`\`\`
-Just retun only code
+
+Continue from here:
 `;
   try {
     const result = await model.generateContent({
