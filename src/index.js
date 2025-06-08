@@ -1,6 +1,7 @@
 const express = require("express");
 const cors = require("cors");
 const { GoogleGenerativeAI } = require("@google/generative-ai");
+const {ModelRouter} = require("./modelRouter.js");
 require("dotenv").config();
 
 const app = express();
@@ -13,6 +14,19 @@ const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const GEMINI_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`;
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
 const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
+
+let modelRouter = new ModelRouter();
+
+// AndreNguyen: update model selected
+app.post("/update-model", async (req, res) => {
+  const { selectedModel } = req.body; 
+  modelRouter.updateModel(selectedModel);
+  console.log(`Backend :::  Model updated to: ${selectedModel}`);
+  const status = await modelRouter.checkStatus();
+  console.log("Backend ::: Model status:", status);
+  res.json({ message: `Model updated to: ${selectedModel}` });
+})
+
 
 app.post("/suggest", (req, res) => {
   const { language, context } = req.body;
@@ -44,13 +58,12 @@ ${context}
 User's request:
 ${prompt}
 
-→ Respond with appropriate code only.
+Only return raw code. Do not use markdown. Do not use triple backticks ('''). Just return plain text.
 `.trim();
   try {
-    const result = await model.generateContent(fullPrompt);
+    const response = await modelRouter.generate(fullPrompt);
 
-    const response = await result.response;
-    const code = response.text().trim();
+    const code = response.text.trim();
     //g("code", code);
 
     res.json({ data: code });
@@ -73,16 +86,14 @@ Language: ${language}
 Code Context (before cursor):
 ${context}
 
-Only return a single line of code as the next suggestion.
+Only return raw single line of code as the next suggestion. Do not use markdown. Do not use triple backticks ('''). Just return plain text.
 `.trim();
 
   try {
-    const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
 
-    const result = await model.generateContent(fullPrompt);
+    const response = await modelRouter.generate(fullPrompt);
 
-    const response = await result.response;
-    const code = response.text().trim();
+    const code = response.text.trim();
 
     res.json({ suggestion: code });
   } catch (error) {
@@ -93,20 +104,14 @@ Only return a single line of code as the next suggestion.
 
 app.get("/status", async (req, res) => {
   try {
-    const geminiRes = await fetch(GEMINI_API_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        contents: [{ parts: [{ text: "ping" }] }],
-      }),
-    });
+    const result = await modelRouter.checkStatus();
 
-    const result = await geminiRes.json();
-    //console.log(result);
-    if (result.candidates?.length > 0) {
-      res.json({ status: "ready" });
+    console.log("Status check result:", result);
+
+    if (result.success) {
+      res.json({ status: "ready", model: result.selectedModel });
     } else {
-      res.status(500).json({ status: "not_ready" });
+      res.status(500).json({ status: "not_ready", error: result.error });
     }
   } catch (err) {
     res.status(500).json({ status: "error", message: err.message });
@@ -130,10 +135,10 @@ ${context}
 `.trim();
 
   try {
-    const result = await model.generateContent(prompt);
-    const text = await result.response.text();
+    const response = await modelRouter.generate(prompt);
+    const result = response.text.trim();
 
-    res.json({ code: text.trim() });
+    res.json({ code: result });
   } catch (error) {
     console.error("Gemini error:", error.message);
     res.status(500).json({ message: "Failed to get suggestion from Gemini" });
@@ -157,9 +162,8 @@ Giải thích:
 `.trim();
 
   try {
-    const result = await model.generateContent(fullPrompt);
-    const response = await result.response;
-    const explanation = response.text().trim();
+    const response = await modelRouter.generate(fullPrompt);
+    const explanation = response.text.trim();
     res.json({ data: explanation });
   } catch (error) {
     console.error("Gemini API Error:", error.message);
@@ -180,11 +184,11 @@ Respond with code only, properly formatted.
 `.trim();
 
   try {
-    const result = await model.generateContent(fullPrompt);
-    const response = await result.response;
-    const code = response.text().trim();
+    const response = await modelRouter.generate(fullPrompt);
+    console.log("Backend :::: response", response);
+    const result = response.text.trim();
 
-    res.json({ data: code });
+    res.json({ data: result });
   } catch (error) {
     console.error("AI Error:", error.message);
     res.status(500).json({ message: "Failed to generate code" });
@@ -199,16 +203,59 @@ app.post("/api/chat", async (req, res) => {
   }
 
   try {
-    const result = await model.generateContent(fullPrompt);
-    const response = await result.response;
-    const code = response.text().trim();
-
-    res.json({ data: code });
+    const response = await modelRouter.generate(fullPrompt);
+    console.log("Backend :::: response", response);
+    const result = response.text.trim();
+    //console.log("Backend api chat:::: result", result);
+    res.json({ data: result });
   } catch (error) {
     console.error("AI Error:", error.message);
     res.status(500).json({ message: "Failed to generate code" });
   }
 });
+
+// chat sreaming
+// Streaming chat - dòng văn bản từng chunk cho client
+app.post("/api/streaming-chat", async (req, res) => {
+  const { fullPrompt } = req.body;
+  if (!fullPrompt) {
+    return res.status(400).json({ message: "fullPrompt is required" });
+  }
+
+  try {
+    // Thiết lập header để hỗ trợ stream trong VSCode hoặc trình duyệt
+    res.setHeader("Content-Type", "text/plain; charset=utf-8");
+    res.setHeader("Transfer-Encoding", "chunked");
+    res.setHeader("Cache-Control", "no-cache");
+    res.setHeader("Connection", "keep-alive");
+
+    // Gọi stream từ modelRouter
+    const result = await modelRouter.generateStream(fullPrompt);
+
+    if (!result.success || !result.stream) {
+      res.write("Streaming failed to start.");
+      return res.end();
+    }
+
+    const stream = result.stream;
+
+    for await (const chunk of stream) {
+      const text = chunk.text || chunk.candidates?.[0]?.content || "";
+      if (text) {
+        res.write(text); // hoặc thêm `+ '\n'` nếu client cần newline để phân biệt
+      }
+    }
+
+    res.end(); // Kết thúc stream
+  } catch (error) {
+    console.error("Streaming error:", error.message);
+    res.status(500).end("Streaming failed");
+  }
+});
+
+
+
+
 let timeoutId = null;
 
 app.post("/api/inline-completion", async (req, res) => {
@@ -236,15 +283,15 @@ ${codeUntilCursor}
 Continue from here:
 `;
   try {
-    const result = await model.generateContent({
-      contents: [{ role: "user", parts: [{ text: fullPrompt }] }],
-      generationConfig: {
+    const response = await modelRouter.generate(
+      fullPrompt,
+      {
         temperature: 0.5,
-        maxOutputTokens: 100,
+        maxTokens: 100,
       },
-    });
-    const response = await result.response;
-    const code = response.text().trim();
+    );
+    const code = response.text.trim();
+    console.log(`codeeeeeee: ${code}`)
     res.json({ data: code });
   } catch (error) {
     console.error("AI Error:", error.message);
