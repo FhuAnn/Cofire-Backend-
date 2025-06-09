@@ -1,7 +1,7 @@
 const express = require("express");
 const cors = require("cors");
 const { GoogleGenerativeAI } = require("@google/generative-ai");
-const {ModelRouter} = require("./modelRouter.js");
+const { ModelRouter } = require("./modelRouter.js");
 require("dotenv").config();
 
 const app = express();
@@ -19,14 +19,13 @@ let modelRouter = new ModelRouter();
 
 // AndreNguyen: update model selected
 app.post("/update-model", async (req, res) => {
-  const { selectedModel } = req.body; 
+  const { selectedModel } = req.body;
   modelRouter.updateModel(selectedModel);
   console.log(`Backend :::  Model updated to: ${selectedModel}`);
   const status = await modelRouter.checkStatus();
   console.log("Backend ::: Model status:", status);
   res.json({ message: `Model updated to: ${selectedModel}` });
-})
-
+});
 
 app.post("/suggest", (req, res) => {
   const { language, context } = req.body;
@@ -90,7 +89,6 @@ Only return raw single line of code as the next suggestion. Do not use markdown.
 `.trim();
 
   try {
-
     const response = await modelRouter.generate(fullPrompt);
 
     const code = response.text.trim();
@@ -151,8 +149,7 @@ app.post("/explain-code", async (req, res) => {
     return res.status(400).json({ message: "Missing code or language" });
 
   const fullPrompt = `
-Bạn là một lập trình viên AI thông minh.
-Hãy giải thích đoạn mã sau bằng ngôn ngữ tự nhiên, rõ ràng, chi tiết, và dễ hiểu cho người học.
+Giải thích đoạn mã sau bằng ngôn ngữ tự nhiên, mạch lạc và chi tiết. Không sử dụng định dạng markdown như tiêu đề, danh sách đánh số hay in đậm. Tuy nhiên, hãy làm nổi bật các thành phần mã (tên hàm, thẻ HTML, biến, thuộc tính, v.v.) bằng cách đặt chúng trong dấu \` \`. Tránh các cụm từ như "tôi sẽ giải thích", "chúng ta cùng xem", hoặc những nhận xét mang tính cảm thán. Chỉ tập trung giải thích chức năng và cách hoạt động của đoạn mã.
 
 Ngôn ngữ: ${language}
 Đoạn mã:
@@ -253,9 +250,6 @@ app.post("/api/streaming-chat", async (req, res) => {
   }
 });
 
-
-
-
 let timeoutId = null;
 
 app.post("/api/inline-completion", async (req, res) => {
@@ -283,15 +277,12 @@ ${codeUntilCursor}
 Continue from here:
 `;
   try {
-    const response = await modelRouter.generate(
-      fullPrompt,
-      {
-        temperature: 0.5,
-        maxTokens: 100,
-      },
-    );
+    const response = await modelRouter.generate(fullPrompt, {
+      temperature: 0.5,
+      maxTokens: 100,
+    });
     const code = response.text.trim();
-    console.log(`codeeeeeee: ${code}`)
+    console.log(`codeeeeeee: ${code}`);
     res.json({ data: code });
   } catch (error) {
     console.error("AI Error:", error.message);

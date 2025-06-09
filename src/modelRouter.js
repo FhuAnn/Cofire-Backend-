@@ -170,7 +170,6 @@ export class ModelRouter {
         model: this.modelName,
       };
     }
-
     try {
       const result = await this.client.checkStatus();
       return {

@@ -88,6 +88,7 @@ export class GeminiClient extends BaseAIClient {
   }
 
   async checkStatus() {
+    
     try {
       const testResult = await this.ai.models.generateContent({
         contents: [{ role: "user", parts: [{ text: "test" }] }],
