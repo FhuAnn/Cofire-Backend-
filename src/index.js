@@ -17,7 +17,7 @@ let modelRouter = new ModelRouter();
 app.post("/list-models", async (req, res) => {
   const { provider, APIKey } = req.body;
   console.log(provider, APIKey);
-  if (!provider && !APIKey)
+  if (!provider || !APIKey)
     return res
       .status(404)
       .json({ success: false, message: "provider and APIKey is required" });
@@ -69,7 +69,7 @@ app.post("/list-models", async (req, res) => {
 app.post("/check-api-key", async (req, res) => {
   try {
     const { provider, APIKey } = req.body;
-    if (!provider && !APIKey)
+    if (!provider || !APIKey)
       return res
         .status(404)
         .json({ success: false, message: "provider and APIKey is required" });
@@ -103,7 +103,7 @@ app.post("/check-api-key", async (req, res) => {
 // AndreNguyen: update model selected
 app.post("/update-model-system", async (req, res) => {
   const { selectedModel, provider } = req.body;
-  if (!selectedModel && !provider)
+  if (!selectedModel || !provider)
     return res.status(404).json({
       success: false,
       message: "selectedModel and provider is required",
@@ -144,7 +144,7 @@ app.post("/update-model-system", async (req, res) => {
 
 app.post("/update-model-user", async (req, res) => {
   const { selectedModel, provider, APIKey } = req.body;
-  if (!selectedModel && !provider && !APIKey)
+  if (!selectedModel || !provider || !APIKey)
     return res.status(404).json({
       success: false,
       message: "selectedModel and provider, APIKey is required",
@@ -177,7 +177,7 @@ app.post("/update-model-user", async (req, res) => {
 app.post("/suggest", (req, res) => {
   const { language, context } = req.body;
   //console.log(`Language: ${language}, Context:\n${context}`);
-  if (!language && !context)
+  if (!language || !context)
     return res.status(404).json({
       success: false,
       message: "language and context is required",
@@ -197,7 +197,7 @@ app.post("/suggest", (req, res) => {
 
 app.post("/manual-prompt", async (req, res) => {
   const { prompt, language, context } = req.body;
-  if (!prompt && !language && !context)
+  if (!prompt || !language || !context)
     return res.status(404).json({
       success: false,
       message: "prompt, language and context is required",
@@ -331,7 +331,7 @@ Giải thích:
 });
 app.post("/generate-file-from-prompt", async (req, res) => {
   const { prompt, language } = req.body;
-  if (!prompt)
+  if (!prompt || !language)
     return res
       .status(400)
       .json({ success: false, message: "prompt and language is required" });
@@ -359,7 +359,7 @@ Respond with code only, properly formatted.
 
 app.post("/api/chat", async (req, res) => {
   const { fullPrompt } = req.body;
-  console.log("api/chat", fullPrompt);
+  //console.log("api/chat", fullPrompt);
   if (!fullPrompt) {
     return res
       .status(400)
@@ -449,7 +449,6 @@ Continue from here:
       maxTokens: 100,
     });
     const code = response.text.trim();
-    console.log(`codeeeeeee: ${code}`);
     res.json({ data: code });
   } catch (error) {
     console.error("AI Error:", error.message);
