@@ -1,4 +1,4 @@
-import Anthropic from '@anthropic-ai/sdk';
+import Anthropic from "@anthropic-ai/sdk";
 import { BaseAIClient } from "./BaseAIClient.js";
 
 export class AnthropicClient extends BaseAIClient {
@@ -11,7 +11,7 @@ export class AnthropicClient extends BaseAIClient {
     const {
       temperature = 0.7,
       max_tokens = 512,
-      model = this.modelName
+      model = this.modelName,
     } = options;
 
     try {
@@ -22,9 +22,9 @@ export class AnthropicClient extends BaseAIClient {
         messages: [
           {
             role: "user",
-            content: prompt
-          }
-        ]
+            content: prompt,
+          },
+        ],
       });
 
       return response?.content?.[0]?.text || null;
@@ -38,9 +38,9 @@ export class AnthropicClient extends BaseAIClient {
     try {
       // Không có endpoint check model cụ thể → gọi thử generate với dummy prompt
       await this.generate("ping", { max_tokens: 1 });
-      return { status: "ok", model: this.modelName };
+      return { status: "ok", model: this.modelName, success: true };
     } catch (error) {
-      return { status: "error", error: error.message };
+      return { status: "error", error: error.message, success: false };
     }
   }
 }

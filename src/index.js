@@ -15,14 +15,18 @@ let modelRouter = new ModelRouter();
 
 //AndreNguyen: get list models from provider
 app.post("/list-models", async (req, res) => {
-  const { provider, apiKey } = req.body;
-
+  const { provider, APIKey } = req.body;
+  console.log(provider, APIKey);
+  if (!provider && !APIKey)
+    return res
+      .status(404)
+      .json({ success: false, message: "provider and APIKey is required" });
   try {
     let models = [];
 
     if (provider === "OpenAI") {
       const response = await fetch("https://api.openai.com/v1/models", {
-        headers: { Authorization: `Bearer ${apiKey}` },
+        headers: { Authorization: `Bearer ${APIKey}` },
       });
       const data = await response.json();
       models = data.data.map((m) => ({ value: m.id, label: m.id }));
@@ -43,7 +47,7 @@ app.post("/list-models", async (req, res) => {
     if (provider === "Anthropic") {
       const response = await fetch("https://api.anthropic.com/v1/models", {
         headers: {
-          "x-api-key": apiKey,
+          "x-api-key": APIKey,
           "anthropic-version": "2023-06-01",
         },
       });
@@ -65,8 +69,12 @@ app.post("/list-models", async (req, res) => {
 app.post("/check-api-key", async (req, res) => {
   try {
     const { provider, APIKey } = req.body;
+    if (!provider && !APIKey)
+      return res
+        .status(404)
+        .json({ success: false, message: "provider and APIKey is required" });
 
-    console.log("Checking API key for provider:", provider, "APIKey:", APIKey);
+    //console.log("Checking API key for provider:", provider, "APIKey:", APIKey);
 
     const testProviderModel = getModelByProvider(provider);
 
@@ -95,13 +103,19 @@ app.post("/check-api-key", async (req, res) => {
 // AndreNguyen: update model selected
 app.post("/update-model-system", async (req, res) => {
   const { selectedModel, provider } = req.body;
-
+  if (!selectedModel && !provider)
+    return res.status(404).json({
+      success: false,
+      message: "selectedModel and provider is required",
+    });
   try {
     // Lấy APIKey từ biến môi trường tương ứng
     const APIKey = process.env[`${provider}_API_KEY`];
 
     if (!APIKey) {
-      return res.status(400).json({ error: `Missing API key for provider: ${provider}` });
+      return res
+        .status(400)
+        .json({ error: `Missing API key for provider: ${provider}` });
     }
 
     const newCustomConfig = {
@@ -130,7 +144,11 @@ app.post("/update-model-system", async (req, res) => {
 
 app.post("/update-model-user", async (req, res) => {
   const { selectedModel, provider, APIKey } = req.body;
-
+  if (!selectedModel && !provider && !APIKey)
+    return res.status(404).json({
+      success: false,
+      message: "selectedModel and provider, APIKey is required",
+    });
   const newCustomConfig = {
     defaultOptions: {
       provider: provider,
@@ -159,7 +177,11 @@ app.post("/update-model-user", async (req, res) => {
 app.post("/suggest", (req, res) => {
   const { language, context } = req.body;
   //console.log(`Language: ${language}, Context:\n${context}`);
-
+  if (!language && !context)
+    return res.status(404).json({
+      success: false,
+      message: "language and context is required",
+    });
   // Trả về mock suggestion
   res.json({
     suggestions: [
@@ -175,6 +197,11 @@ app.post("/suggest", (req, res) => {
 
 app.post("/manual-prompt", async (req, res) => {
   const { prompt, language, context } = req.body;
+  if (!prompt && !language && !context)
+    return res.status(404).json({
+      success: false,
+      message: "prompt, language and context is required",
+    });
   //console.log(prompt, language, context);
   const fullPrompt = `
 You're an AI code assistant.
@@ -204,7 +231,9 @@ Only return raw code. Do not use markdown. Do not use triple backticks ('''). Ju
 app.post("/suggest-typing", async (req, res) => {
   const { language, context } = req.body;
   if (!language || !context)
-    return res.status(404).json({ message: "khong du bien" });
+    return res
+      .status(404)
+      .json({ success: false, message: "language and context is required" });
   const fullPrompt = `
 You are an intelligent AI coding assistant. 
 Based on the programming language and the given code context, suggest the next logical line of code that a developer might write. 
@@ -248,7 +277,9 @@ app.get("/status", async (req, res) => {
 app.post("/suggest-block", async (req, res) => {
   const { language, context } = req.body;
   if (!language || !context)
-    return res.status(400).json({ message: "Missing input" });
+    return res
+      .status(400)
+      .json({ success: false, message: "language and context is required" });
 
   const prompt = `
 You are an expert coding assistant.
@@ -275,7 +306,9 @@ ${context}
 app.post("/explain-code", async (req, res) => {
   const { code, language } = req.body;
   if (!code || !language)
-    return res.status(400).json({ message: "Missing code or language" });
+    return res
+      .status(400)
+      .json({ success: false, message: "code and language is required" });
 
   const fullPrompt = `
 Giải thích đoạn mã sau bằng ngôn ngữ tự nhiên, mạch lạc và chi tiết. Không sử dụng định dạng markdown như tiêu đề, danh sách đánh số hay in đậm. Tuy nhiên, hãy làm nổi bật các thành phần mã (tên hàm, thẻ HTML, biến, thuộc tính, v.v.) bằng cách đặt chúng trong dấu \` \`. Tránh các cụm từ như "tôi sẽ giải thích", "chúng ta cùng xem", hoặc những nhận xét mang tính cảm thán. Chỉ tập trung giải thích chức năng và cách hoạt động của đoạn mã.
@@ -298,7 +331,10 @@ Giải thích:
 });
 app.post("/generate-file-from-prompt", async (req, res) => {
   const { prompt, language } = req.body;
-  if (!prompt) return res.status(400).json({ message: "Missing prompt" });
+  if (!prompt)
+    return res
+      .status(400)
+      .json({ success: false, message: "prompt and language is required" });
 
   const fullPrompt = `
 You are an expert software engineer AI assistant.
@@ -325,7 +361,9 @@ app.post("/api/chat", async (req, res) => {
   const { fullPrompt } = req.body;
   console.log("api/chat", fullPrompt);
   if (!fullPrompt) {
-    return res.status(400).json({ message: " fullPrompt is required" });
+    return res
+      .status(400)
+      .json({ success: false, message: " fullPrompt is required" });
   }
 
   try {

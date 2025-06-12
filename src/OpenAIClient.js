@@ -5,7 +5,7 @@ export class OpenAIClient extends BaseAIClient {
   constructor(apiKey, modelName = "gpt-4o") {
     super(apiKey, modelName);
     this.ai = new OpenAI({
-      apiKey: this.apiKey
+      apiKey: this.apiKey,
     });
   }
 
@@ -13,7 +13,7 @@ export class OpenAIClient extends BaseAIClient {
     const {
       temperature = 0.7,
       max_tokens = 512,
-      model = this.modelName
+      model = this.modelName,
     } = options;
 
     try {
@@ -21,7 +21,7 @@ export class OpenAIClient extends BaseAIClient {
         model,
         messages: [{ role: "user", content: prompt }],
         temperature,
-        max_tokens
+        max_tokens,
       });
 
       return response.choices[0]?.message?.content || null;
@@ -35,9 +35,9 @@ export class OpenAIClient extends BaseAIClient {
     try {
       // Gọi một request đơn giản để kiểm tra API key hoạt động
       await this.ai.models.retrieve(this.modelName);
-      return { status: "ok", model: this.modelName };
+      return { status: "ok", model: this.modelName, success: true };
     } catch (error) {
-      return { status: "error", error: error.message };
+      return { status: "error", error: error.message, success: false };
     }
   }
 }
