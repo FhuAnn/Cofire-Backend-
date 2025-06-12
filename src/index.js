@@ -2,6 +2,7 @@ const express = require("express");
 const cors = require("cors");
 const { GoogleGenerativeAI } = require("@google/generative-ai");
 const { ModelRouter } = require("./modelRouter.js");
+const { MODEL_REGISTRY, getModelByProvider } = require("./modelRegistry.js");
 require("dotenv").config();
 
 const app = express();
@@ -10,21 +11,149 @@ const PORT = 5000;
 app.use(cors());
 app.use(express.json());
 
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
-const GEMINI_API_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`;
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
-const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash" });
-
 let modelRouter = new ModelRouter();
 
+//AndreNguyen: get list models from provider
+app.post("/list-models", async (req, res) => {
+  const { provider, apiKey } = req.body;
+
+  try {
+    let models = [];
+
+    if (provider === "OpenAI") {
+      const response = await fetch("https://api.openai.com/v1/models", {
+        headers: { Authorization: `Bearer ${apiKey}` },
+      });
+      const data = await response.json();
+      models = data.data.map((m) => ({ value: m.id, label: m.id }));
+    }
+
+    if (provider === "Gemini") {
+      models = [
+        { value: "gemini-1.5-pro", label: "Gemini 1.5 Pro" },
+        { value: "gemini-1.5-flash", label: "Gemini 1.5 Flash" },
+        { value: "gemini-2.0-flash-lite", label: "Gemini 2.0 Flash Lite" },
+        {
+          value: "gemini-2.5-flash-preview-05-20",
+          label: "Gemini 2.5 Flash Preview 05 20",
+        },
+      ];
+    }
+
+    if (provider === "Anthropic") {
+      const response = await fetch("https://api.anthropic.com/v1/models", {
+        headers: {
+          "x-api-key": apiKey,
+          "anthropic-version": "2023-06-01",
+        },
+      });
+      const data = await response.json();
+
+      models = data.models.map((m) => ({
+        value: m.name,
+        label: m.name,
+      }));
+    }
+
+    res.json({ success: true, models });
+  } catch (err) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// AndreNguyen: check api key provider valid
+app.post("/check-api-key", async (req, res) => {
+  try {
+    const { provider, APIKey } = req.body;
+
+    console.log("Checking API key for provider:", provider, "APIKey:", APIKey);
+
+    const testProviderModel = getModelByProvider(provider);
+
+    const customConfig = APIKey ? { apiKeys: { [provider]: APIKey } } : {}; // Nếu không có APIKey, dùng mặc định
+    console.log("Custom config for modelRouter:", customConfig);
+    const test = new ModelRouter(testProviderModel, customConfig);
+
+    const status = await test.checkStatus();
+
+    console.log("Model status:", status);
+
+    if (!status.success) {
+      return res.status(400).json({ error: status.error });
+    }
+
+    return res.json({
+      status: "ready",
+      provider,
+    });
+  } catch (err) {
+    console.error("Error in /check-api-key:", err);
+    return res.status(500).json({ error: err.message, status: "error" });
+  }
+});
+
 // AndreNguyen: update model selected
-app.post("/update-model", async (req, res) => {
-  const { selectedModel } = req.body;
-  modelRouter.updateModel(selectedModel);
-  console.log(`Backend :::  Model updated to: ${selectedModel}`);
-  const status = await modelRouter.checkStatus();
-  console.log("Backend ::: Model status:", status);
-  res.json({ message: `Model updated to: ${selectedModel}` });
+app.post("/update-model-system", async (req, res) => {
+  const { selectedModel, provider } = req.body;
+
+  try {
+    // Lấy APIKey từ biến môi trường tương ứng
+    const APIKey = process.env[`${provider}_API_KEY`];
+
+    if (!APIKey) {
+      return res.status(400).json({ error: `Missing API key for provider: ${provider}` });
+    }
+
+    const newCustomConfig = {
+      defaultOptions: {
+        provider: provider,
+      },
+      apiKeys: {
+        [provider]: APIKey,
+      },
+    };
+
+    modelRouter.updateModel(selectedModel, newCustomConfig);
+    console.log(`Backend ::: Model system updated to: ${selectedModel}`);
+
+    const status = await modelRouter.checkStatus();
+    console.log("Backend ::: Model system status:", status);
+
+    res.json({ message: `Model system updated to: ${selectedModel}`, status });
+  } catch (err) {
+    console.error("Update model system failed:", err);
+    res
+      .status(500)
+      .json({ message: "Failed to update model system", error: err.message });
+  }
+});
+
+app.post("/update-model-user", async (req, res) => {
+  const { selectedModel, provider, APIKey } = req.body;
+
+  const newCustomConfig = {
+    defaultOptions: {
+      provider: provider,
+    },
+    apiKeys: {
+      [provider]: APIKey,
+    },
+  };
+
+  try {
+    modelRouter.updateModel(selectedModel, newCustomConfig);
+    console.log(`Backend ::: Model user updated to: ${selectedModel}`);
+
+    const status = await modelRouter.checkStatus();
+    console.log("Backend ::: Model user status:", status);
+
+    res.json({ message: `Model user updated to: ${selectedModel}`, status });
+  } catch (err) {
+    console.error("Update model failed:", err);
+    res
+      .status(500)
+      .json({ message: "Failed to update model", error: err.message });
+  }
 });
 
 app.post("/suggest", (req, res) => {
