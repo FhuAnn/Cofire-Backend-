@@ -359,7 +359,7 @@ Respond with code only, properly formatted.
 
 app.post("/api/chat", async (req, res) => {
   const { fullPrompt } = req.body;
-  //console.log("api/chat", fullPrompt);
+
   if (!fullPrompt) {
     return res
       .status(400)
@@ -373,8 +373,17 @@ app.post("/api/chat", async (req, res) => {
     //console.log("Backend api chat:::: result", result);
     res.json({ data: result });
   } catch (error) {
-    console.error("AI Error:", error.message);
-    res.status(500).json({ message: "Failed to generate code" });
+    console.error(
+      `AI Error in ${error.file || "index.js"}:`,
+      error.message,
+      error.stack
+    );
+    res.status(error.status || 500).json({
+      success: false,
+      message: error.message,
+      file: error.file || "index.js",
+      stack: error.stack, // Trả stack trace cho frontend (chỉ trong môi trường dev)
+    });
   }
 });
 
