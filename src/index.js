@@ -1,15 +1,43 @@
-const express = require("express");
-const cors = require("cors");
-const { GoogleGenerativeAI } = require("@google/generative-ai");
-const { ModelRouter } = require("./modelRouter.js");
-const { MODEL_REGISTRY, getModelByProvider } = require("./modelRegistry.js");
-require("dotenv").config();
+import express from "express";
+import session from "express-session";
+import passport from "passport";
+import cors from "cors";
+import api from "./apis/index.js";
+//import  { GoogleGenerativeAI } from "@google/generative-ai";
+import { ModelRouter } from "./modelRouter.js";
+import { MODEL_REGISTRY, getModelByProvider } from "./modelRegistry.js";
+import "./auth/github.js";
+import dotenv from "dotenv";
+dotenv.config();
+import connectToDb from "./config/db.js";
 
 const app = express();
 const PORT = 5000;
 
+connectToDb();
+
 app.use(cors());
 app.use(express.json());
+
+app.use(
+  session({
+    secret: process.env.SESSION_SECRET,
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+      name: "connect.sid",
+      path: "/",
+      secure: false,
+      httpOnly: true,
+      maxAge: 1000 * 60 * 60,
+    },
+  })
+);
+app.use(passport.initialize());
+app.use(passport.session());
+
+// API routes
+api(app);
 
 let modelRouter = new ModelRouter();
 
@@ -425,8 +453,6 @@ app.post("/api/streaming-chat", async (req, res) => {
     res.status(500).end("Streaming failed");
   }
 });
-
-let timeoutId = null;
 
 app.post("/api/inline-completion", async (req, res) => {
   const { full, language, codeUntilCursor } = req.body;
