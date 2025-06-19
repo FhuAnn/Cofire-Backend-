@@ -5,7 +5,9 @@ class HistoryController {
   async createOrUpdateMessage(req, res) {
     await connectToDb();
     try {
-      const { userId, conversationId, role, content } = req.body;
+      const { userId, conversationId, role, content, summary, model } =
+        req.body;
+      //console.log("Creating or updating message with data:", req.body);
       if (!userId || !role || !content) {
         return res.status(400).json({
           success: false,
@@ -20,14 +22,17 @@ class HistoryController {
             success: false,
             message: `Conversation (${conversationId})not found`,
           });
-        conversation.messages.push({ role, content });
+        conversation.messages.push({ role, content, model });
         conversation.updateAt = new Date();
+        if (summary) {
+          conversation.summary = summary;
+        }
         await conversation.save();
       } else {
         conversation = new Conversation({
           userId,
           title: content.slice(0, 30),
-          messages: [{ role, content }],
+          messages: [{ role, content, model }],
         });
         await conversation.save();
       }
@@ -85,7 +90,8 @@ class HistoryController {
         });
       }
       const conversation = await Conversation.findById(conversationId).sort({
-        updateAt: 1});
+        updateAt: 1,
+      });
       if (!conversation)
         return res.status(404).json({
           success: false,
@@ -136,6 +142,13 @@ class HistoryController {
         error: error.message,
       });
     }
+  }
+
+  summaryChatHistory(req, res) {
+    return res.status(501).json({
+      success: false,
+      message: "Summary chat history feature is not implemented yet",
+    });
   }
 }
 

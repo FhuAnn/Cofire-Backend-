@@ -490,6 +490,63 @@ Continue from here:
     res.status(500).json({ message: "Failed to generate code" });
   }
 });
+
+// API tóm tắt hội thoại
+app.post("/api/summary", async (req, res) => {
+  try {
+    const { previousSummary, userMessage, aiMessage } = req.body;
+    console.log("request body for summary:", req.body);
+    if (!userMessage || !aiMessage) {
+      return res.status(400).json({
+        success: false,
+        message: "userMessage and aiMessage is required",
+      });
+    }
+
+    const pairToSummarize = `
+User: ${userMessage.content}
+AI: ${aiMessage.content}
+`;
+
+    const contentToSummarize = previousSummary
+      ? `Previous Summary:
+${previousSummary}
+
+New Exchange:
+${pairToSummarize}`
+      : `New Exchange:
+${pairToSummarize}`;
+
+    const summaryPrompt = `
+You are a summarization assistant.
+
+We have an existing summary of the conversation (if any), and then two newest messages (user and AI). 
+Please produce a new, concise summary that:
+- Retains all important context and decisions made so far.
+- Incorporates the content from the previous summary (if given).
+- Adds the two latest messages in a coherent, concise fashion.
+
+${contentToSummarize}
+
+New Summary:
+`;
+
+    const response = await modelRouter.generate(summaryPrompt);
+    const newSummary = response.text.trim();
+
+    return res.status(200).json({
+      success: true,
+      data: newSummary,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: "Error summarize conversation",
+      error: error.message,
+    });
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`Mock AI server running at http://localhost:${PORT}`);
 });
