@@ -25,11 +25,11 @@ export class GeminiClient extends BaseAIClient {
 
       const response = await this.ai.models.generateContent({
         contents: [
-        {
-          role: "user",
-          parts: [{ text: prompt }],
-        },
-      ],
+          {
+            role: "user",
+            parts: [{ text: prompt }],
+          },
+        ],
         model: this.modelName,
         generationConfig,
       });
@@ -46,15 +46,16 @@ export class GeminiClient extends BaseAIClient {
         provider: "gemini",
       };
     } catch (error) {
-      return {
-        success: false,
-        error: error.message,
-        provider: "gemini",
-      };
+      const customError = new Error(`Gemini API error: ${error.message}`);
+      customError.status = error.status || 500;
+      customError.provider = "gemini";
+      customError.file = "GeminiClient.js";
+      customError.stack = error.stack;
+      throw customError;
     }
   }
 
-   async generateStream(prompt, options = {}) {
+  async generateStream(prompt, options = {}) {
     try {
       const {
         temperature = 0.2,
@@ -70,13 +71,13 @@ export class GeminiClient extends BaseAIClient {
         maxOutputTokens: maxTokens,
       };
 
-       const streamResponse = await this.ai.models.generateContentStream({
+      const streamResponse = await this.ai.models.generateContentStream({
         contents: [
-        {
-          role: "user",
-          parts: [{ text: prompt }],
-        },
-      ],
+          {
+            role: "user",
+            parts: [{ text: prompt }],
+          },
+        ],
         model: this.modelName,
         generationConfig,
       });
@@ -88,7 +89,6 @@ export class GeminiClient extends BaseAIClient {
   }
 
   async checkStatus() {
-    
     try {
       const testResult = await this.ai.models.generateContent({
         contents: [{ role: "user", parts: [{ text: "test" }] }],
@@ -116,4 +116,3 @@ export class GeminiClient extends BaseAIClient {
     }
   }
 }
-

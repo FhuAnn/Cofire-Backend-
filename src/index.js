@@ -1,15 +1,43 @@
-const express = require("express");
-const cors = require("cors");
-const { GoogleGenerativeAI } = require("@google/generative-ai");
-const { ModelRouter } = require("./modelRouter.js");
-const { MODEL_REGISTRY, getModelByProvider } = require("./modelRegistry.js");
-require("dotenv").config();
+import express from "express";
+import session from "express-session";
+import passport from "passport";
+import cors from "cors";
+import api from "./apis/index.js";
+//import  { GoogleGenerativeAI } from "@google/generative-ai";
+import { ModelRouter } from "./modelRouter.js";
+import { MODEL_REGISTRY, getModelByProvider } from "./modelRegistry.js";
+import "./auth/github.js";
+import dotenv from "dotenv";
+dotenv.config();
+import connectToDb from "./config/db.js";
 
 const app = express();
 const PORT = 5000;
 
+connectToDb();
+
 app.use(cors());
 app.use(express.json());
+
+app.use(
+  session({
+    secret: process.env.SESSION_SECRET,
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+      name: "connect.sid",
+      path: "/",
+      secure: false,
+      httpOnly: true,
+      maxAge: 1000 * 60 * 60,
+    },
+  })
+);
+app.use(passport.initialize());
+app.use(passport.session());
+
+// API routes
+api(app);
 
 let modelRouter = new ModelRouter();
 
@@ -17,7 +45,7 @@ let modelRouter = new ModelRouter();
 app.post("/list-models", async (req, res) => {
   const { provider, APIKey } = req.body;
   console.log(provider, APIKey);
-  if (!provider && !APIKey)
+  if (!provider || !APIKey)
     return res
       .status(404)
       .json({ success: false, message: "provider and APIKey is required" });
@@ -69,7 +97,7 @@ app.post("/list-models", async (req, res) => {
 app.post("/check-api-key", async (req, res) => {
   try {
     const { provider, APIKey } = req.body;
-    if (!provider && !APIKey)
+    if (!provider || !APIKey)
       return res
         .status(404)
         .json({ success: false, message: "provider and APIKey is required" });
@@ -103,7 +131,7 @@ app.post("/check-api-key", async (req, res) => {
 // AndreNguyen: update model selected
 app.post("/update-model-system", async (req, res) => {
   const { selectedModel, provider } = req.body;
-  if (!selectedModel && !provider)
+  if (!selectedModel || !provider)
     return res.status(404).json({
       success: false,
       message: "selectedModel and provider is required",
@@ -144,7 +172,7 @@ app.post("/update-model-system", async (req, res) => {
 
 app.post("/update-model-user", async (req, res) => {
   const { selectedModel, provider, APIKey } = req.body;
-  if (!selectedModel && !provider && !APIKey)
+  if (!selectedModel || !provider || !APIKey)
     return res.status(404).json({
       success: false,
       message: "selectedModel and provider, APIKey is required",
@@ -177,7 +205,7 @@ app.post("/update-model-user", async (req, res) => {
 app.post("/suggest", (req, res) => {
   const { language, context } = req.body;
   //console.log(`Language: ${language}, Context:\n${context}`);
-  if (!language && !context)
+  if (!language || !context)
     return res.status(404).json({
       success: false,
       message: "language and context is required",
@@ -197,7 +225,7 @@ app.post("/suggest", (req, res) => {
 
 app.post("/manual-prompt", async (req, res) => {
   const { prompt, language, context } = req.body;
-  if (!prompt && !language && !context)
+  if (!prompt || !language || !context)
     return res.status(404).json({
       success: false,
       message: "prompt, language and context is required",
@@ -331,7 +359,7 @@ Giải thích:
 });
 app.post("/generate-file-from-prompt", async (req, res) => {
   const { prompt, language } = req.body;
-  if (!prompt)
+  if (!prompt || !language)
     return res
       .status(400)
       .json({ success: false, message: "prompt and language is required" });
@@ -359,7 +387,7 @@ Respond with code only, properly formatted.
 
 app.post("/api/chat", async (req, res) => {
   const { fullPrompt } = req.body;
-  console.log("api/chat", fullPrompt);
+
   if (!fullPrompt) {
     return res
       .status(400)
@@ -373,8 +401,17 @@ app.post("/api/chat", async (req, res) => {
     //console.log("Backend api chat:::: result", result);
     res.json({ data: result });
   } catch (error) {
-    console.error("AI Error:", error.message);
-    res.status(500).json({ message: "Failed to generate code" });
+    console.error(
+      `AI Error in ${error.file || "index.js"}:`,
+      error.message,
+      error.stack
+    );
+    res.status(error.status || 500).json({
+      success: false,
+      message: error.message,
+      file: error.file || "index.js",
+      stack: error.stack, // Trả stack trace cho frontend (chỉ trong môi trường dev)
+    });
   }
 });
 
@@ -417,8 +454,6 @@ app.post("/api/streaming-chat", async (req, res) => {
   }
 });
 
-let timeoutId = null;
-
 app.post("/api/inline-completion", async (req, res) => {
   const { full, language, codeUntilCursor } = req.body;
   console.log("api/inline-completiont", full, codeUntilCursor, language);
@@ -449,13 +484,69 @@ Continue from here:
       maxTokens: 100,
     });
     const code = response.text.trim();
-    console.log(`codeeeeeee: ${code}`);
     res.json({ data: code });
   } catch (error) {
     console.error("AI Error:", error.message);
     res.status(500).json({ message: "Failed to generate code" });
   }
 });
+
+// API tóm tắt hội thoại
+app.post("/api/summary", async (req, res) => {
+  try {
+    const { previousSummary, userMessage, aiMessage } = req.body;
+    console.log("request body for summary:", req.body);
+    if (!userMessage || !aiMessage) {
+      return res.status(400).json({
+        success: false,
+        message: "userMessage and aiMessage is required",
+      });
+    }
+
+    const pairToSummarize = `
+User: ${userMessage.content}
+AI: ${aiMessage.content}
+`;
+
+    const contentToSummarize = previousSummary
+      ? `Previous Summary:
+${previousSummary}
+
+New Exchange:
+${pairToSummarize}`
+      : `New Exchange:
+${pairToSummarize}`;
+
+    const summaryPrompt = `
+You are a summarization assistant.
+
+We have an existing summary of the conversation (if any), and then two newest messages (user and AI). 
+Please produce a new, concise summary that:
+- Retains all important context and decisions made so far.
+- Incorporates the content from the previous summary (if given).
+- Adds the two latest messages in a coherent, concise fashion.
+
+${contentToSummarize}
+
+New Summary:
+`;
+
+    const response = await modelRouter.generate(summaryPrompt);
+    const newSummary = response.text.trim();
+
+    return res.status(200).json({
+      success: true,
+      data: newSummary,
+    });
+  } catch (error) {
+    return res.status(500).json({
+      success: false,
+      message: "Error summarize conversation",
+      error: error.message,
+    });
+  }
+});
+
 app.listen(PORT, () => {
   console.log(`Mock AI server running at http://localhost:${PORT}`);
 });
