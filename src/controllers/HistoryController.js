@@ -7,7 +7,7 @@ class HistoryController {
     try {
       const { userId, conversationId, role, content, summary, model } =
         req.body;
-      //console.log("Creating or updating message with data:", req.body);
+      console.log("Creating or updating message with data:", req.body);
       if (!userId || !role || !content) {
         return res.status(400).json({
           success: false,
@@ -54,6 +54,7 @@ class HistoryController {
     await connectToDb();
     try {
       const { userId } = req.query;
+      console.log("Fetching conversation list for user:", userId);
       if (!userId) {
         return res.status(400).json({
           success: false,
@@ -143,12 +144,34 @@ class HistoryController {
       });
     }
   }
+  async deleteConversation(req, res) {
+    await connectToDb();
+    try {
+      const { conversationId } = req.query;
+      if (!conversationId) {
+        return res.status(400).json({
+          success: false,
+          message: "Conversation ID is required",
+        });
+      }
+      const conversation = await Conversation.findByIdAndDelete(conversationId);
+      if (!conversation)
+        return res.status(404).json({
+          success: false,
+          message: `Conversation (${conversationId}) not found`,
+        });
 
-  summaryChatHistory(req, res) {
-    return res.status(501).json({
-      success: false,
-      message: "Summary chat history feature is not implemented yet",
-    });
+      return res.status(200).json({
+        success: true,
+        message: `Conversation (${conversationId}) deleted successfully`,
+      });
+    } catch (error) {
+      return res.status(500).json({
+        success: false,
+        message: `Error deleting conversation (${req.query.conversationId})`,
+        error: error.message,
+      });
+    }
   }
 }
 

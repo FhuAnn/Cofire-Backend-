@@ -17,13 +17,13 @@ passport.use(
       callbackURL: process.env.CALLBACK_URL,
       scope: ["repo"],
     },
-    (profile, done) => {
+    (accessToken, refreshToken, profile, done) => {
       const user = {
         id: profile.id,
         username: profile.username,
         avatar: profile.photos?.[0]?.value,
       };
-      done(null, user);
+      done(null, { user, accessToken });
     }
   )
 );
