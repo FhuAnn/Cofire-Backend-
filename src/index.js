@@ -4,8 +4,8 @@ import passport from "passport";
 import cors from "cors";
 import api from "./apis/index.js";
 //import  { GoogleGenerativeAI } from "@google/generative-ai";
-import { ModelRouter } from "./modelRouter.js";
-import { MODEL_REGISTRY, getModelByProvider } from "./modelRegistry.js";
+import { ModelRouter } from "./ai/modelRouter.js";
+import { MODEL_REGISTRY, getModelByProvider } from "./ai/modelRegistry.js";
 import "./auth/github.js";
 import dotenv from "dotenv";
 dotenv.config();
@@ -387,7 +387,7 @@ Respond with code only, properly formatted.
 
 app.post("/api/chat", async (req, res) => {
   const { fullPrompt } = req.body;
-
+  console.log("Backend api chat", fullPrompt);
   if (!fullPrompt) {
     return res
       .status(400)

@@ -1,12 +1,19 @@
 import connectToDb from "../config/db.js";
-import Conversation from "../models/conversation.js";
+import Conversation from "../models/Conversation.js";
 
 class HistoryController {
   async createOrUpdateMessage(req, res) {
     await connectToDb();
     try {
-      const { userId, conversationId, role, content, summary, model } =
-        req.body;
+      const {
+        userId,
+        conversationId,
+        role,
+        content,
+        summary,
+        model,
+        attaches,
+      } = req.body;
       console.log("Creating or updating message with data:", req.body);
       if (!userId || !role || !content) {
         return res.status(400).json({
@@ -22,7 +29,7 @@ class HistoryController {
             success: false,
             message: `Conversation (${conversationId})not found`,
           });
-        conversation.messages.push({ role, content, model });
+        conversation.messages.push({ role, content, model, attaches });
         conversation.updateAt = new Date();
         if (summary) {
           conversation.summary = summary;
@@ -32,7 +39,7 @@ class HistoryController {
         conversation = new Conversation({
           userId,
           title: content.slice(0, 30),
-          messages: [{ role, content, model }],
+          messages: [{ role, content, model, attaches }],
         });
         await conversation.save();
       }

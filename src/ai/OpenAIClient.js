@@ -1,5 +1,5 @@
 import { OpenAI } from "openai";
-import { BaseAIClient } from "./BaseAIClient.js";
+import { BaseAIClient } from "../ai/BaseAIClient.js";
 
 export class OpenAIClient extends BaseAIClient {
   constructor(apiKey, modelName = "gpt-4o") {
